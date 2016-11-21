@@ -39,16 +39,51 @@ const std::vector<std::string> OPCODE_LIST =
   "ROTATE LEFT W/ CARRY", "XOR i8", "XOR d9", "XOR d9", "XOR Indirect", "XOR Indirect", "XOR Indirect", "XOR Indirect",
   "SET BIT d9, b3", "SET BIT d9, b3", "SET BIT d9, b3", "SET BIT d9, b3", "SET BIT d9, b3", "SET BIT d9, b3", "SET BIT d9, b3", "SET BIT d9, b3"
 };
+const std::vector<int> SIZE_LIST = 
+{
+  1, 2, 2, 2, 1, 1, 1, 1,
+  2, 2, 2, 2, 2, 2, 2, 2,
+  3, 3, 2, 2, 1, 1, 1, 1, 
+  2, 2, 2, 2, 2, 2, 2, 2,
+  3, 3, 3, 3, 2, 2, 2, 2, 
+  2, 2, 2, 2, 2, 2, 2, 2,
+  1, 3, 3, 3, 3, 3, 3, 3, 
+  2, 2, 2, 2, 2, 2, 2, 2,
+  1, 3, 3, 3, 3, 3, 3, 3,
+  3, 3, 3, 3, 3, 3, 3, 3,
+  0, 0, 3, 3, 2, 2, 2, 2,
+  3, 3, 3, 3, 3, 3, 3, 3,
+  2, 2, 2, 2, 1, 1, 1, 1, 
+  3, 3, 3, 3, 3, 3, 3, 3, 
+  2, 2, 2, 2, 1, 1, 1, 1, 
+  3, 3, 3, 3, 3, 3, 3, 3,
+  2, 2, 2, 2, 1, 1, 1, 1,
+  3, 3, 3, 3, 3, 3, 3, 3,
+  2, 2, 2, 2, 1, 1, 1, 1, 
+  3, 3, 3, 3, 3, 3, 3, 3,
+  1, 2, 2, 2, 1, 1, 1, 1,
+  2, 2, 2, 2, 2, 2, 2, 2,
+  1, 2, 2, 2, 1, 1, 1, 1,
+  2, 2, 2, 2, 2, 2, 2, 2,
+  1, 1, 2, 2, 1, 1, 1, 1,
+  2, 2, 2, 2, 2, 2, 2, 2,
+  1, 2, 2, 2, 1, 1, 1, 1, 
+  2, 2, 2, 2, 2, 2, 2, 2,
+  1, 2, 2, 2, 1, 1, 1, 1,
+  2, 2, 2, 2, 2, 2, 2, 2, 
+  1, 2, 2, 2, 1, 1, 1, 1,
+  2, 2, 2, 2, 2, 2, 2, 2,
+};
 //Loops through an entire byte array of size length and outputs to a file if writeFile is true, otherwise outputs to the console
-void Disassemble(const unsigned char* data, const unsigned int size, const bool writeFile = false, const std::string fileName = "");
-
-void PrintDisassembly();
-
-void WriteFileDisassembly();
+void Disassemble(const unsigned char* data, const unsigned int size, const std::string fileName = "");
 
 //Fetches a human readable opcode name for the instruction blocked pointed to by data at location offset
 //Returns the length of the opcode
 int FetchOpcode(const unsigned char* data, const unsigned int offset, std::string& outName);
+
+//Returns the File name for a the output
+//Ex: Passing "GAME.VMS" returns "GAMEDISASSEMBLY.TXT"
+std::string MakeFileName(std::string inputFileName);
 
 //Converts a byte to its representation as a hexadecimal string
 //i.e. if data = 255, then this function returns "FF"
