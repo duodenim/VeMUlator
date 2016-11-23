@@ -1,7 +1,8 @@
 //Copyright 2016 Joseph Schulte
 //Licensed under GPLv3
 //See included LICENSE file for details
-
+#ifndef DISASSEMBLER
+#define DISASSEMBLER
 #include <string>
 #include <vector>
 const std::vector<std::string> OPCODE_LIST =
@@ -91,3 +92,4 @@ std::string ByteToHexOutput(unsigned char data);
 
 //Converts a single 4 byte word to its hex representation
 char WordToHex(unsigned char word);
+#endif
