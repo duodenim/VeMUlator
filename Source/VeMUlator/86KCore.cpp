@@ -15,6 +15,11 @@ State86K::State86K(unsigned char * inRom, unsigned char * inRamBank0, unsigned c
   endProgram = false;
 }
 
+void State86K::Init()
+{
+  sfr[PSW] = 0b00000010;
+}
+
 int State86K::RunInstruction()
 {
   int cycles = 0;
@@ -29,7 +34,88 @@ int State86K::UnImplementedInstruction()
   std::cout << "WITH CODE: " << ByteToHexOutput(rom[pc]);
 
   endProgram = true;
+  
+  return 0;
+}
 
+int State86K::Get4BitNumber(unsigned char data)
+{
+  int MSB = data & 0b00010000;
+  MSB /= 2;
+  int LowerBits = data & 0b00000111;
+
+  return MSB + LowerBits;
+}
+
+unsigned char * State86K::GetRamBank()
+{
+  if (sfr[PSW] & RAM_BANK)
+  {
+    return ramBank1;
+  }
+  else
+  {
+    return ramBank0;
+  }
+}
+
+int State86K::ADD()
+{
+  UnImplementedInstruction();
+  return 0;
+}
+
+int State86K::AND()
+{
+  UnImplementedInstruction();
+  return 0;
+}
+
+int State86K::BRANCH()
+{
+  UnImplementedInstruction();
+  return 0;
+}
+
+int State86K::CALL()
+{
+  UnImplementedInstruction();
+  return 0;
+}
+
+int State86K::CLR()
+{
+  int bitNumber = Get4BitNumber(rom[pc]) & 0b00000111;
+  if (Get4BitNumber(rom[pc]) & 0b00010000)
+  {
+    //SFR
+    sfr[rom[pc + 1]] &= ~(1 << bitNumber);
+  }
+  else
+  {
+    //Normal RAM
+    GetRamBank()[rom[pc + 1]] &= ~(1 << bitNumber);
+  }
+
+  pc += 2;
+  return 1;
+}
+
+int State86K::DEC()
+{
+  UnImplementedInstruction();
+  return 0;
+}
+
+int State86K::DIV()
+{
+  UnImplementedInstruction();
+  return 0;
+}
+
+int State86K::INC()
+{
+  UnImplementedInstruction();
   return 0;
 }
 
@@ -50,4 +136,126 @@ int State86K::JMP()
     UnImplementedInstruction();
   }
   return cycles;
+}
+
+int State86K::LDC()
+{
+  UnImplementedInstruction();
+  return 0;
+}
+
+int State86K::LOAD()
+{
+  UnImplementedInstruction();
+  return 0;
+}
+
+int State86K::MOV()
+{
+  UnImplementedInstruction();
+  return 0;
+}
+
+int State86K::MUL()
+{
+  UnImplementedInstruction();
+  return 0;
+}
+
+int State86K::NOP()
+{
+  UnImplementedInstruction();
+  return 0;
+}
+
+int State86K::NOT()
+{
+  UnImplementedInstruction();
+  int bitNumber = Get4BitNumber(rom[pc]) & 0b00000111;
+  if (Get4BitNumber(rom[pc]) & 0b00010000)
+  {
+    //SFR
+    sfr[rom[pc + 1]] ^= (1 << bitNumber);
+  }
+  else
+  {
+    //Normal RAM
+    GetRamBank()[rom[pc + 1]] ^= (1 << bitNumber);
+  }
+
+  pc += 2;
+  return 1;
+  return 0;
+}
+
+int State86K::OR()
+{
+  UnImplementedInstruction();
+  return 0;
+}
+
+int State86K::POP()
+{
+  UnImplementedInstruction();
+  return 0;
+}
+
+int State86K::PUSH()
+{
+  UnImplementedInstruction();
+  return 0;
+}
+
+int State86K::RET()
+{
+  UnImplementedInstruction();
+  return 0;
+}
+
+int State86K::ROTATE()
+{
+  UnImplementedInstruction();
+  return 0;
+}
+
+int State86K::SET()
+{
+  int bitNumber = Get4BitNumber(rom[pc]) & 0b00000111;
+  if (Get4BitNumber(rom[pc]) & 0b00010000)
+  {
+    //SFR
+    sfr[rom[pc + 1]] |= (1 << bitNumber);
+  }
+  else
+  {
+    //Normal RAM
+    GetRamBank()[rom[pc + 1]] |= (1 << bitNumber);
+  }
+
+  pc += 2;
+  return 1;
+}
+
+int State86K::STORE()
+{
+  UnImplementedInstruction();
+  return 0;
+}
+
+int State86K::SUB()
+{
+  UnImplementedInstruction();
+  return 0;
+}
+
+int State86K::XCH()
+{
+  UnImplementedInstruction();
+  return 0;
+}
+
+int State86K::XOR()
+{
+  UnImplementedInstruction();
+  return 0;
 }

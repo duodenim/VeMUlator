@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
   file.close();
 
   State86K *cpu = new State86K(rom, ram0, ram1, sfr);
-
+  cpu->Init();
   while (!cpu->endProgram)
   {
     cpu->RunInstruction();
