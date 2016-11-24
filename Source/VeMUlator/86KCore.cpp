@@ -170,7 +170,6 @@ int State86K::NOP()
 
 int State86K::NOT()
 {
-  UnImplementedInstruction();
   int bitNumber = Get4BitNumber(rom[pc]) & 0b00000111;
   if (Get4BitNumber(rom[pc]) & 0b00010000)
   {
