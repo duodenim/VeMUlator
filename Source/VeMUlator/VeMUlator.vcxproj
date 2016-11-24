@@ -110,6 +110,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\VeMUDisassembler\Disassembler.cpp" />
     <ClCompile Include="86KCore.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>

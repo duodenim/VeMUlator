@@ -16,6 +16,11 @@
 
     High 256 byte area mapped to Special Function Registers (SFR)
 */
+const int ROM_SIZE = 65536;
+const int RAM0_SIZE = 256;
+const int RAM1_SIZE = 256;
+const int SFR_SIZE = 256;
+
 //Listing of addresses of relevant special function
 //registers
 enum SFR
@@ -44,7 +49,7 @@ enum PSW_Bits
   AUX_CARRY = 0b01000000,
   INDIRECT_BANK1 = 0b00010000,
   INDIRECT_BANK0 = 0b00001000,
-  OVERFLOW = 0b00000100,
+  OVER_FLOW = 0b00000100,
   RAM_BANK = 0b00000010,
   PARITY = 0b00000001
 };
