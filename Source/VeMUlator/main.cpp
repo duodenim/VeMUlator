@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
     cpu->RunInstruction();
   }
 
-
+  delete cpu;
   delete[] rom;
   delete[] ram0;
   delete[] ram1;

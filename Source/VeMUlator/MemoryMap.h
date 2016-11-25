@@ -25,15 +25,15 @@ const int SFR_SIZE = 256;
 //registers
 enum SFR
 {
-  ACC = 0x100,
-  PSW = 0x101,
-  B = 0x102,
-  C = 0x103,
-  TRL = 0x104,
-  TRH = 0x105,
-  SP = 0x106,
-  XRAM_Start = 0x180,
-  XRAM_End = 0x1fb
+  ACC = 0x000,
+  PSW = 0x001,
+  B = 0x002,
+  C = 0x003,
+  TRL = 0x004,
+  TRH = 0x005,
+  SP = 0x006,
+  XRAM_Start = 0x080,
+  XRAM_End = 0x0fb
 };
 
 enum SysVar

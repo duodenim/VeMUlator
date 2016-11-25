@@ -146,14 +146,50 @@ int State86K::LDC()
 
 int State86K::LOAD()
 {
-  UnImplementedInstruction();
-  return 0;
+  unsigned char data;
+  if (rom[pc] == 0x02)
+  {
+    data = GetRamBank()[rom[pc + 1]];
+    pc += 2;
+  }
+  else if (rom[pc] = 0x03)
+  {
+    data = sfr[rom[pc + 1]];
+    pc += 2;
+  }
+  else
+  {
+    UnImplementedInstruction(); //Indirect
+  }
+  sfr[ACC] = data;
+  return 1;
 }
 
 int State86K::MOV()
 {
-  UnImplementedInstruction();
-  return 0;
+  unsigned char data;
+  int cycles = 1;
+  if (rom[pc] == 0x22 || rom[pc] == 0x23) //Direct from ram
+  {
+    data = rom[pc + 2];
+    cycles = 2;
+  }
+  else //Indirect
+  {
+    UnImplementedInstruction();
+  }
+
+  if (rom[pc] == 0x22)
+  {
+    GetRamBank()[rom[pc + 1]] = data;
+    pc += 3;
+  }
+  else if (rom[pc] == 0x23)
+  {
+    sfr[rom[pc + 1]] = data;
+    pc += 3;
+  }
+  return cycles;
 }
 
 int State86K::MUL()
@@ -164,7 +200,6 @@ int State86K::MUL()
 
 int State86K::NOP()
 {
-  UnImplementedInstruction();
   return 0;
 }
 
