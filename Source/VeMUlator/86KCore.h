@@ -6,7 +6,7 @@
 #include <vector>
 #include <functional>
 #include "MemoryMap.h"
-#include "..\VeMUDisassembler\Disassembler.h"
+#include "../VeMUDisassembler/Disassembler.h"
 class State86K
 {
 public:
