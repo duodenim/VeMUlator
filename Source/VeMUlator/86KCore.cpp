@@ -18,6 +18,7 @@ State86K::State86K(unsigned char * inRom, unsigned char * inRamBank0, unsigned c
 void State86K::Init()
 {
   sfr[PSW] = 0b00000010;
+  sfr[SP] = 0x80;
 }
 
 int State86K::RunInstruction()
@@ -30,7 +31,8 @@ int State86K::RunInstruction()
 int State86K::UnImplementedInstruction()
 {
   std::cout << "FATAL ERROR: UNIMPLEMENTED INSTRUCTION\n";
-  std::cout << "AT: " << pc << "\n";
+  std::cout << "AT: " << ByteToHexOutput((pc & 0xff00) >> 8) << " " 
+            << ByteToHexOutput(pc & 0xff) << "\n";
   std::cout << "WITH CODE: " << ByteToHexOutput(rom[pc]);
 
   endProgram = true;
@@ -79,8 +81,20 @@ int State86K::BRANCH()
 
 int State86K::CALL()
 {
-  UnImplementedInstruction();
-  return 0;
+  //Push return address onto stack
+  int retAddress = pc + 2;
+  sfr[SP]++;
+  ramBank0[sfr[SP]] = retAddress & 0xff;
+  sfr[SP]++;
+  ramBank0[sfr[SP]] = (retAddress & 0xff00) >> 8;
+
+  //Build and assign the new address
+  int oldPC = pc;
+  pc &= 0xf000;
+  pc += (rom[oldPC] & 0x0f) << 8;
+  pc += rom[oldPC + 1];
+
+  return 2;
 }
 
 int State86K::CLR()
@@ -236,8 +250,13 @@ int State86K::POP()
 
 int State86K::PUSH()
 {
-  UnImplementedInstruction();
-  return 0;
+  int address = (rom[pc] & 0b1) << 8;
+  address += rom[pc + 1];
+
+  sfr[SP]++;
+  ramBank0[sfr[SP]] = GetRamBank()[address];
+  pc += 2;
+  return 2;
 }
 
 int State86K::RET()
@@ -272,8 +291,20 @@ int State86K::SET()
 
 int State86K::STORE()
 {
-  UnImplementedInstruction();
-  return 0;
+  if (rom[pc] == 0x12 || rom[pc] == 0x13)
+  {
+    //Direct
+    int address = rom[pc + 1];
+    address += (rom[pc] & 0b1) << 8;
+    GetRamBank()[address] = sfr[ACC];
+    pc += 2;
+  }
+  else
+  {
+    //Indirect
+    UnImplementedInstruction();
+  }
+  return 1;
 }
 
 int State86K::SUB()
@@ -290,6 +321,29 @@ int State86K::XCH()
 
 int State86K::XOR()
 {
-  UnImplementedInstruction();
-  return 0;
+  int address;
+  switch (rom[pc]) 
+  {
+  case 0xF1: //Immediate
+    sfr[ACC] = rom[pc + 1] ^ sfr[ACC];
+    pc += 2;
+    break;
+  case 0xF2: //Direct
+  case 0xF3:
+    address = rom[pc + 1];
+    address += (rom[pc] & 0b1) << 8;
+    sfr[ACC] = GetRamBank()[address] ^ sfr[ACC];
+    pc += 2;
+    break;
+  case 0xF4: //Indirect
+  case 0xF5:
+  case 0xF6:
+  case 0xF7:
+    UnImplementedInstruction();
+    break;
+
+  default:
+    UnImplementedInstruction();
+  }
+  return 1;
 }
