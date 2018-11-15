@@ -273,3 +273,9 @@ __pycache__/
 
 # Cake - Uncomment if you are using it
 # tools/
+/target
+**/*.rs.bk
+
+#ROM files
+*.VMS
+*.vms

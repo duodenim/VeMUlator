@@ -1,0 +1,14 @@
+[package]
+name = "VeMUlator"
+version = "0.1.0"
+authors = ["Joseph Schulte <schulteajoseph@gmail.com>"]
+
+[[bin]]
+name = "emulator"
+path = "src/main.rs"
+
+[[bin]]
+name = "disassembler"
+path = "src/disassembler.rs"
+
+[dependencies]
