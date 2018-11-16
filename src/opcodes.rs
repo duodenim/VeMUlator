@@ -12,7 +12,6 @@ macro_rules! opcode {
     }
 }
 
-
 pub const OPCODES_86K: [Opcode; 256] = [
     opcode!("NOP", 1), //0x00
     opcode!("BR r8", 2),
