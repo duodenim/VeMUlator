@@ -7,7 +7,12 @@ const ACC_PTR: u16 = 0x100;
 const PSW_PTR: u16 = 0x101;
 const B_PTR: u16 = 0x102;
 const C_PTR: u16 = 0x103;
+const TRL_PTR: u16 = 0x104;
+const TRH_PTR: u16 = 0x105;
 const SP_PTR: u16 = 0x106;
+const P3_PTR: u16 = 0x14C;
+const LCD_START_PTR: u16 = 0x180;
+const LCD_END_PTR: u16 = 0x1FB;
 
 use opcodes::OPCODES_86K;
 
@@ -17,7 +22,7 @@ const INSTRUCTIONS: [fn(&mut CPU, &[u8]) -> u8; 256]  = [
     CPU::call_a12, CPU::call_a12, CPU::call_a12, CPU::call_a12, //0x08-0x0B
     CPU::call_a12, CPU::call_a12, CPU::call_a12, CPU::call_a12, //0x0C-0x0F
     CPU::unimplemented, CPU::unimplemented, CPU::st_d9, CPU::st_d9, //0x10-0x13
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x14-0x17
+    CPU::st_ri, CPU::st_ri, CPU::st_ri, CPU::st_ri, //0x14-0x17
     CPU::call_a12, CPU::call_a12, CPU::call_a12, CPU::call_a12, //0x18-0x1B
     CPU::call_a12, CPU::call_a12, CPU::call_a12, CPU::call_a12, //0x1C-0x1F
     CPU::unimplemented, CPU::jmpf_a16, CPU::mov_i8_d9, CPU::mov_i8_d9, //0x20-0x23
@@ -46,12 +51,12 @@ const INSTRUCTIONS: [fn(&mut CPU, &[u8]) -> u8; 256]  = [
     CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, //0x7C-0x7F
     CPU::unimplemented, CPU::add_i8, CPU::unimplemented, CPU::unimplemented, //0x80-0x83
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x84-0x87
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x88-0x8B
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x8C-0x8F
+    CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, //0x88-0x8B
+    CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, //0x8C-0x8F
     CPU::bnz_r8, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x90-0x93
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x94-0x97
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x98-0x9B
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x9C-0x9F
+    CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, //0x98-0x9B
+    CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, //0x9C-0x9F
     CPU::ret, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xA0-0xA3
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xA4-0xA7
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xA8-0xAB
@@ -60,7 +65,7 @@ const INSTRUCTIONS: [fn(&mut CPU, &[u8]) -> u8; 256]  = [
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xB4-0xB7
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xB8-0xBB
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xBC-0xBF
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xC0-0xC3
+    CPU::unimplemented, CPU::ldc, CPU::unimplemented, CPU::unimplemented, //0xC0-0xC3
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xC4-0xC7
     CPU::clr1_d9_b3, CPU::clr1_d9_b3, CPU::clr1_d9_b3, CPU::clr1_d9_b3, //0xC8-0xCB
     CPU::clr1_d9_b3, CPU::clr1_d9_b3, CPU::clr1_d9_b3, CPU::clr1_d9_b3, //0xCC-0xCF
@@ -202,6 +207,20 @@ impl CPU {
         1
     }
 
+    fn bn_d9_b3_r8(&mut self, instruction: &[u8]) -> u8 {
+        let d9_high_bit = ((instruction[0] & 0b00010000) as u16) << 4;
+        let d9_low_bits = instruction[1] as u16;
+        let address = d9_high_bit | d9_low_bits;
+        let bit_address = instruction[0] & 0b00000111;
+        let bit_mask = 1 << bit_address;
+        let value = self.read_ram_value(address);
+        if (value & bit_mask) == 0 {
+            let relative_address = instruction[2] as i8;
+            self.program_counter = self.program_counter.wrapping_add(relative_address as u16);
+        }
+        2
+    }
+
     fn bne_i8_r8(&mut self, instruction: &[u8]) -> u8 {
         let compare_value = instruction[1];
         let acc = self.read_ram_value(ACC_PTR);
@@ -236,7 +255,7 @@ impl CPU {
         let d9_low_bits = instruction[1] as u16;
         let address = d9_high_bit | d9_low_bits;
         let bit_address = instruction[0] & 0b00000111;
-        let bit_mask = (1 << bit_address);
+        let bit_mask = 1 << bit_address;
         let value = self.read_ram_value(address);
         if (value & bit_mask) != 0 {
             let relative_address = instruction[2] as i8;
@@ -317,6 +336,20 @@ impl CPU {
         1
     }
 
+    fn ldc(&mut self, instruction: &[u8]) -> u8 {
+        let trl = self.read_ram_value(TRL_PTR) as u16;
+        let trh = (self.read_ram_value(TRH_PTR) as u16) << 8;
+        let tr = trl | trh;
+        let acc = self.read_ram_value(ACC_PTR) as u16;
+
+        //TODO: ACC might be signed, check this
+        let addr = acc + tr;
+        let acc = self.rom[addr as usize];
+        self.write_ram_value(ACC_PTR, acc);
+
+        2
+    }
+
     fn mov_i8_d9(&mut self, instruction: &[u8]) -> u8 {
         let value = instruction[2];
         let address_low = instruction[1] as u16;
@@ -393,6 +426,14 @@ impl CPU {
 
         let data = self.read_ram_value(ACC_PTR);
         self.write_ram_value(address, data);
+        1
+    }
+
+    fn st_ri(&mut self, instruction: &[u8]) -> u8 {
+        let register = instruction[0] & 0x03;
+        let address = self.get_indirect_address(register);
+        let acc = self.read_ram_value(ACC_PTR);
+        self.write_ram_value(address, acc);
         1
     }
 
