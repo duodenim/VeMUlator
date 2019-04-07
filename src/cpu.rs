@@ -3,31 +3,32 @@ const RAM_BANK_0_SIZE: usize = 256;
 const RAM_BANK_1_SIZE: usize = 256;
 const RAM_SFR_SIZE: usize = 256;
 
-const ACC: u16 = 0x100;
-const PSW: u16 = 0x101;
-const B: u16 = 0x102;
-const C: u16 = 0x103;
+const ACC_PTR: u16 = 0x100;
+const PSW_PTR: u16 = 0x101;
+const B_PTR: u16 = 0x102;
+const C_PTR: u16 = 0x103;
+const SP_PTR: u16 = 0x106;
 
 use opcodes::OPCODES_86K;
 
 const INSTRUCTIONS: [fn(&mut CPU, &[u8]) -> u8; 256]  = [
-    CPU::nop, CPU::unimplemented, CPU::ld_d9, CPU::ld_d9, //0x00-0x03
+    CPU::nop, CPU::br_r8, CPU::ld_d9, CPU::ld_d9, //0x00-0x03
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x04-0x07
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x08-0x0B
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x0C-0x0F
+    CPU::call_a12, CPU::call_a12, CPU::call_a12, CPU::call_a12, //0x08-0x0B
+    CPU::call_a12, CPU::call_a12, CPU::call_a12, CPU::call_a12, //0x0C-0x0F
     CPU::unimplemented, CPU::unimplemented, CPU::st_d9, CPU::st_d9, //0x10-0x13
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x14-0x17
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x18-0x1B
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x1C-0x1F
+    CPU::call_a12, CPU::call_a12, CPU::call_a12, CPU::call_a12, //0x18-0x1B
+    CPU::call_a12, CPU::call_a12, CPU::call_a12, CPU::call_a12, //0x1C-0x1F
     CPU::unimplemented, CPU::jmpf_a16, CPU::mov_i8_d9, CPU::mov_i8_d9, //0x20-0x23
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x24-0x27
+    CPU::mov_i8_ri, CPU::mov_i8_ri, CPU::mov_i8_ri, CPU::mov_i8_ri, //0x24-0x27
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x28-0x2B
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x2C-0x2F
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x30-0x33
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x34-0x37
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x38-0x3B
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x3C-0x3F
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x40-0x43
+    CPU::unimplemented, CPU::bne_i8_r8, CPU::unimplemented, CPU::unimplemented, //0x40-0x43
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x44-0x47
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x48-0x4B
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x4C-0x4F
@@ -35,23 +36,23 @@ const INSTRUCTIONS: [fn(&mut CPU, &[u8]) -> u8; 256]  = [
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x54-0x%7
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x58-0x5B
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x5C-0x5F
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x60-0x63
+    CPU::push_d9, CPU::push_d9, CPU::inc_d9, CPU::inc_d9, //0x60-0x63
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x64-0x67
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x68-0x6B
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x6C-0x6F
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x70-0x73
+    CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, //0x68-0x6B
+    CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, //0x6C-0x6F
+    CPU::pop_d9, CPU::pop_d9, CPU::unimplemented, CPU::unimplemented, //0x70-0x73
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x74-0x77
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x78-0x7B
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x7C-0x7F
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x80-0x83
+    CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, //0x78-0x7B
+    CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, //0x7C-0x7F
+    CPU::unimplemented, CPU::add_i8, CPU::unimplemented, CPU::unimplemented, //0x80-0x83
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x84-0x87
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x88-0x8B
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x8C-0x8F
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x90-0x93
+    CPU::bnz_r8, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x90-0x93
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x94-0x97
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x98-0x9B
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x9C-0x9F
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xA0-0xA3
+    CPU::ret, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xA0-0xA3
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xA4-0xA7
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xA8-0xAB
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xAC-0xAF
@@ -67,7 +68,7 @@ const INSTRUCTIONS: [fn(&mut CPU, &[u8]) -> u8; 256]  = [
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xD4-0xD7
     CPU::clr1_d9_b3, CPU::clr1_d9_b3, CPU::clr1_d9_b3, CPU::clr1_d9_b3, //0xD8-0xDB
     CPU::clr1_d9_b3, CPU::clr1_d9_b3, CPU::clr1_d9_b3, CPU::clr1_d9_b3, //0xDC-0xDF
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xE0-0xE3
+    CPU::unimplemented, CPU::and_i8, CPU::unimplemented, CPU::unimplemented, //0xE0-0xE3
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xE4-0xE7
     CPU::set1_d9_b3, CPU::set1_d9_b3, CPU::set1_d9_b3, CPU::set1_d9_b3, //0xE8-0xEB
     CPU::set1_d9_b3, CPU::set1_d9_b3, CPU::set1_d9_b3, CPU::set1_d9_b3, //0xEC-0xEF
@@ -88,13 +89,18 @@ pub struct CPU {
 impl CPU {
     pub fn new(rom: Vec<u8>) -> CPU {
         assert!(rom.len() <= ROM_SIZE, "ROM is too big!");
-        CPU {
+        let mut cpu = CPU {
             rom,
             ram_bank0: [0; RAM_BANK_0_SIZE],
             ram_bank1: [0; RAM_BANK_1_SIZE],
             ram_sfr: [0; RAM_SFR_SIZE],
             program_counter: 0
-        }
+        };
+
+        //Initialize SFRs
+        cpu.write_ram_value(SP_PTR, 0x7F);
+
+        cpu
     }
 
     pub fn run(&mut self) {
@@ -133,6 +139,141 @@ impl CPU {
         }
     }
 
+    fn get_indirect_address(&mut self, register: u8) -> u16 {
+        assert!(register <= 3, "Only registers R0 through R3 can be used for indirect addressing!");
+        let psw = self.read_ram_value(PSW_PTR);
+        let irbk = (psw & 0b00011000) >> 3;
+        let mut address = ((4 * irbk) + register) as u16;
+        if register == 2 || register == 3 { //R2 and R3 always read from SFRs
+            address |= 0x100;
+        }
+
+        address
+    }
+
+    fn set_carry(&mut self) {
+        let psw = self.read_ram_value(PSW_PTR);
+        let psw = psw | 0x80;
+        self.write_ram_value(PSW_PTR, psw);
+    }
+
+    fn clear_carry(&mut self) {
+        let psw = self.read_ram_value(PSW_PTR);
+        let psw = psw & 0x7F;
+        self.write_ram_value(PSW_PTR, psw);
+    }
+
+    fn stack_push(&mut self, data: u8) {
+        //Increment stack pointer
+        let sp = self.read_ram_value(SP_PTR) + 1;
+
+        //Write to new stack pointer value
+        self.ram_bank0[sp as usize] = data;
+        self.write_ram_value(SP_PTR, sp);
+    }
+
+    fn stack_pop(&mut self) -> u8 {
+        //Read stack pointer
+        let sp = self.read_ram_value(SP_PTR);
+
+        //Read stack
+        let ret = self.ram_bank0[sp as usize];
+        self.write_ram_value(SP_PTR, sp - 1);
+
+        ret
+    }
+
+    fn add_i8(&mut self, instruction: &[u8]) -> u8 {
+        let value = instruction[1] as u16;
+        let acc = self.read_ram_value(ACC_PTR) as u16;
+        let result = value + acc;
+
+        //TODO: CY, AC, and OV checks
+        let result = (result & 0xff) as u8;
+        self.write_ram_value(ACC_PTR, result);
+        1
+    }
+
+    fn and_i8(&mut self, instruction: &[u8]) -> u8 {
+        let term  = instruction[1];
+        let acc = self.read_ram_value(ACC_PTR);
+        let acc = acc & term;
+        self.write_ram_value(ACC_PTR, acc);
+        1
+    }
+
+    fn bne_i8_r8(&mut self, instruction: &[u8]) -> u8 {
+        let compare_value = instruction[1];
+        let acc = self.read_ram_value(ACC_PTR);
+
+        if acc < compare_value {
+            self.set_carry();
+        } else {
+            self.clear_carry();
+        }
+
+        if acc != compare_value {
+            let relative_address = instruction[2] as i8;
+            self.program_counter = self.program_counter.wrapping_add(relative_address as u16);
+        }
+
+        2
+    }
+
+    fn bnz_r8(&mut self, instruction: &[u8]) -> u8 {
+        let acc = self.read_ram_value(ACC_PTR);
+
+        if acc != 0 {
+            let relative_address = instruction[1] as i8;
+            self.program_counter = self.program_counter.wrapping_add(relative_address as u16);
+        }
+
+        2
+    }
+
+    fn bp_d9_b3_r8(&mut self, instruction: &[u8]) -> u8 {
+        let d9_high_bit = ((instruction[0] & 0b00010000) as u16) << 4;
+        let d9_low_bits = instruction[1] as u16;
+        let address = d9_high_bit | d9_low_bits;
+        let bit_address = instruction[0] & 0b00000111;
+        let bit_mask = (1 << bit_address);
+        let value = self.read_ram_value(address);
+        if (value & bit_mask) != 0 {
+            let relative_address = instruction[2] as i8;
+            self.program_counter = self.program_counter.wrapping_add(relative_address as u16);
+        }
+
+        2
+    }
+
+    fn br_r8(&mut self, instruction: &[u8]) -> u8 {
+        let relative_address = instruction[1] as i8;
+        self.program_counter = self.program_counter.wrapping_add(relative_address as u16);
+        println!("Branch address is {:X}", self.program_counter);
+
+        2
+    }
+
+    fn call_a12(&mut self, instruction: &[u8]) -> u8 {
+        let call_address_low = instruction[1] as u16;
+        let call_address_mid = ((instruction[0] & 0b00000111) as u16) << 8;
+        let call_address_high = ((instruction[0] & 0b00010000) as u16) << 7;
+        let current_high_4_bits = self.program_counter & 0xF000;
+        let call_address = call_address_low | call_address_mid | call_address_high | current_high_4_bits;
+
+        let save_address_low = (self.program_counter & 0x00FF) as u8;
+        let save_address_high = ((self.program_counter & 0xFF00) >> 8) as u8;
+
+        //Save pc onto stack
+        self.stack_push(save_address_low);
+        self.stack_push(save_address_high);
+
+        //Set program counter to call address
+        self.program_counter = call_address;
+
+        2
+    }
+
     fn clr1_d9_b3(&mut self, instruction: &[u8]) -> u8 {
         let ram_address_low = instruction[1] as u16;
         let ram_address_high = ((instruction[0] & 0b00010000) as u16) << 4;
@@ -143,6 +284,16 @@ impl CPU {
 
         let data = self.read_ram_value(ram_address);
         self.write_ram_value(ram_address, data & mask);
+
+        1
+    }
+
+    fn inc_d9(&mut self, instruction: &[u8]) -> u8 {
+        let ram_address_low = instruction[1] as u16;
+        let ram_address_high = ((instruction[0] & 0x01) as u16) << 8;
+        let address = ram_address_high | ram_address_low;
+        let value = self.read_ram_value(address) + 1;
+        self.write_ram_value(address, value);
 
         1
     }
@@ -161,7 +312,7 @@ impl CPU {
         let address_low = instruction[1] as u16;
         let address = address_low | address_high;
         let data = self.read_ram_value(address);
-        self.write_ram_value(ACC, data);
+        self.write_ram_value(ACC_PTR, data);
 
         1
     }
@@ -178,8 +329,48 @@ impl CPU {
         2
     }
 
+    fn mov_i8_ri(&mut self, instruction: &[u8]) -> u8 {
+        let value = instruction[1];
+        let register = instruction[0] & 0x03;
+        let address = self.get_indirect_address(register);
+        self.write_ram_value(address, value);
+
+        1
+    }
+
     fn nop(&mut self, _instruction: &[u8]) -> u8 {
         1
+    }
+
+    fn pop_d9(&mut self, instruction: &[u8]) -> u8 {
+        let addr_low = instruction[1] as u16;
+        let addr_high = ((instruction[0] & 0x01) as u16) << 8;
+        let addr = addr_high | addr_low;
+
+        let data = self.stack_pop();
+        self.write_ram_value(addr, data);
+
+        2
+    }
+
+    fn push_d9(&mut self, instruction: &[u8]) -> u8 {
+        let ram_address_low = instruction[1] as u16;
+        let ram_address_high = ((instruction[0] & 0x01) as u16) << 8;
+        let ram_address = ram_address_low | ram_address_high;
+
+        let data = self.read_ram_value(ram_address);
+        self.stack_push(data);
+        2
+    }
+
+    fn ret(&mut self, _instruction: &[u8]) -> u8 {
+        let pc_high = (self.stack_pop() as u16) << 8;
+        let pc_low = self.stack_pop() as u16;
+        let new_pc = pc_high | pc_low;
+
+        println!("Returning from function to address {:X}", new_pc);
+        self.program_counter = new_pc;
+        2
     }
 
     fn set1_d9_b3(&mut self, instruction: &[u8]) -> u8 {
@@ -200,7 +391,7 @@ impl CPU {
         let address_low = instruction[1] as u16;
         let address = address_low | address_high;
 
-        let data = self.read_ram_value(ACC);
+        let data = self.read_ram_value(ACC_PTR);
         self.write_ram_value(address, data);
         1
     }
@@ -210,10 +401,10 @@ impl CPU {
         let address_high = ((instruction[0] & 0x01) as u16) << 8;
         let address = address_low | address_high;
         let value = self.read_ram_value(address);
-        let a = self.read_ram_value(ACC);
+        let a = self.read_ram_value(ACC_PTR);
 
         let result = a^value;
-        self.write_ram_value(ACC, result);
+        self.write_ram_value(ACC_PTR, result);
         1
     }
 
