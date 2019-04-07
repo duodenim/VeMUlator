@@ -33,7 +33,7 @@ const INSTRUCTIONS: [fn(&mut CPU, &[u8]) -> u8; 256]  = [
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x34-0x37
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x38-0x3B
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x3C-0x3F
-    CPU::unimplemented, CPU::bne_i8_r8, CPU::unimplemented, CPU::unimplemented, //0x40-0x43
+    CPU::div, CPU::bne_i8_r8, CPU::unimplemented, CPU::unimplemented, //0x40-0x43
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x44-0x47
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x48-0x4B
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x4C-0x4F
@@ -49,11 +49,11 @@ const INSTRUCTIONS: [fn(&mut CPU, &[u8]) -> u8; 256]  = [
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x74-0x77
     CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, //0x78-0x7B
     CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, CPU::bp_d9_b3_r8, //0x7C-0x7F
-    CPU::unimplemented, CPU::add_i8, CPU::unimplemented, CPU::unimplemented, //0x80-0x83
+    CPU::unimplemented, CPU::add_i8, CPU::add_d9, CPU::add_d9, //0x80-0x83
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x84-0x87
     CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, //0x88-0x8B
     CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, //0x8C-0x8F
-    CPU::bnz_r8, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x90-0x93
+    CPU::bnz_r8, CPU::addc_i8, CPU::unimplemented, CPU::unimplemented, //0x90-0x93
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x94-0x97
     CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, //0x98-0x9B
     CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, CPU::bn_d9_b3_r8, //0x9C-0x9F
@@ -77,7 +77,7 @@ const INSTRUCTIONS: [fn(&mut CPU, &[u8]) -> u8; 256]  = [
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xE4-0xE7
     CPU::set1_d9_b3, CPU::set1_d9_b3, CPU::set1_d9_b3, CPU::set1_d9_b3, //0xE8-0xEB
     CPU::set1_d9_b3, CPU::set1_d9_b3, CPU::set1_d9_b3, CPU::set1_d9_b3, //0xEC-0xEF
-    CPU::unimplemented, CPU::unimplemented, CPU::xor_d9, CPU::xor_d9, //0xF0-0xF3
+    CPU::rolc, CPU::unimplemented, CPU::xor_d9, CPU::xor_d9, //0xF0-0xF3
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xF4-0xF7
     CPU::set1_d9_b3, CPU::set1_d9_b3, CPU::set1_d9_b3, CPU::set1_d9_b3, //0xF8-0xFB
     CPU::set1_d9_b3, CPU::set1_d9_b3, CPU::set1_d9_b3, CPU::set1_d9_b3, //0xFC-0xFF
@@ -117,6 +117,8 @@ impl CPU {
             instruction.push(self.rom[self.program_counter as usize + i as usize]);
         }
 
+        self.write_ram_value(P3_PTR, 0b11001111); //Force A/B always held until proper input support is added
+
         //Do program counter adjustment here, which will be overwritten by JMP or CALLs as necessary
         self.program_counter += OPCODES_86K[instr_code as usize].num_bytes as u16;
         INSTRUCTIONS[instr_code as usize](self, &instruction);
@@ -148,7 +150,8 @@ impl CPU {
         assert!(register <= 3, "Only registers R0 through R3 can be used for indirect addressing!");
         let psw = self.read_ram_value(PSW_PTR);
         let irbk = (psw & 0b00011000) >> 3;
-        let mut address = ((4 * irbk) + register) as u16;
+        let address = ((4 * irbk) + register) as u16;
+        let mut address = self.read_ram_value(address) as u16;
         if register == 2 || register == 3 { //R2 and R3 always read from SFRs
             address |= 0x100;
         }
@@ -165,6 +168,23 @@ impl CPU {
     fn clear_carry(&mut self) {
         let psw = self.read_ram_value(PSW_PTR);
         let psw = psw & 0x7F;
+        self.write_ram_value(PSW_PTR, psw);
+    }
+
+    fn get_carry(&mut self) -> u8 {
+        let psw = self.read_ram_value(PSW_PTR);
+        (psw & 0x7F) >> 7
+    }
+
+    fn set_overflow(&mut self) {
+        let psw = self.read_ram_value(PSW_PTR);
+        let psw = psw | 0b00000100;
+        self.write_ram_value(PSW_PTR, psw);
+    }
+
+    fn clear_overflow(&mut self) {
+        let psw = self.read_ram_value(PSW_PTR);
+        let psw = psw & 0b11111011;
         self.write_ram_value(PSW_PTR, psw);
     }
 
@@ -188,12 +208,62 @@ impl CPU {
         ret
     }
 
+    fn add_d9(&mut self, instruction: &[u8]) -> u8 {
+        let d9_high = ((instruction[0] & 0x01) as u16) << 8;
+        let d9_low = instruction[1] as u16;
+        let d9 = d9_high | d9_low;
+        let value = self.read_ram_value(d9) as u16;
+        let acc = self.read_ram_value(ACC_PTR) as u16;
+        let result = value + acc;
+
+        let carry = result & 0x100;
+
+        if carry != 0 {
+            self.set_carry();
+        } else {
+            self.clear_carry();
+        }
+
+        //TODO: AC, OV checks
+        let result = (result & 0xff) as u8;
+        self.write_ram_value(ACC_PTR, result);
+        1
+    }
+
     fn add_i8(&mut self, instruction: &[u8]) -> u8 {
         let value = instruction[1] as u16;
         let acc = self.read_ram_value(ACC_PTR) as u16;
         let result = value + acc;
 
-        //TODO: CY, AC, and OV checks
+        let carry = result & 0x100;
+
+        if carry != 0 {
+            self.set_carry();
+        } else {
+            self.clear_carry();
+        }
+
+        //TODO: AC, and OV checks
+        let result = (result & 0xff) as u8;
+        self.write_ram_value(ACC_PTR, result);
+        1
+    }
+
+    fn addc_i8(&mut self, instruction: &[u8]) -> u8 {
+        let value = instruction[1] as u16;
+        let acc = self.read_ram_value(ACC_PTR) as u16;
+        let carry = self.get_carry() as u16;
+        let result = value + acc + carry;
+
+        let carry = result & 0x100;
+
+        if carry != 0 {
+            self.set_carry();
+        } else {
+            self.clear_carry();
+        }
+
+        //TODO: AC, OV checks
         let result = (result & 0xff) as u8;
         self.write_ram_value(ACC_PTR, result);
         1
@@ -268,7 +338,6 @@ impl CPU {
     fn br_r8(&mut self, instruction: &[u8]) -> u8 {
         let relative_address = instruction[1] as i8;
         self.program_counter = self.program_counter.wrapping_add(relative_address as u16);
-        println!("Branch address is {:X}", self.program_counter);
 
         2
     }
@@ -307,6 +376,33 @@ impl CPU {
         1
     }
 
+    fn div(&mut self, _instruction: &[u8]) -> u8 {
+        let acc = self.read_ram_value(ACC_PTR) as u16;
+        let c = self.read_ram_value(C_PTR) as u16;
+        let b = self.read_ram_value(B_PTR) as u16;
+        let top = (acc << 8) | c;
+        let bot = b;
+
+        let quotient = top / bot;
+        let remainder = top % bot;
+
+        self.clear_carry();
+
+        if remainder == 0 {
+            self.set_overflow();
+        } else {
+            self.clear_overflow();
+        }
+
+        let b = (remainder & 0xff) as u8;
+        let c = (quotient & 0xff) as u8;
+        let acc = ((quotient & 0xff00) >> 8) as u8;
+        self.write_ram_value(ACC_PTR, acc);
+        self.write_ram_value(B_PTR, b);
+        self.write_ram_value(C_PTR, c);
+        7
+    }
+
     fn inc_d9(&mut self, instruction: &[u8]) -> u8 {
         let ram_address_low = instruction[1] as u16;
         let ram_address_high = ((instruction[0] & 0x01) as u16) << 8;
@@ -342,7 +438,6 @@ impl CPU {
         let tr = trl | trh;
         let acc = self.read_ram_value(ACC_PTR) as u16;
 
-        //TODO: ACC might be signed, check this
         let addr = acc + tr;
         let acc = self.rom[addr as usize];
         self.write_ram_value(ACC_PTR, acc);
@@ -404,6 +499,23 @@ impl CPU {
         println!("Returning from function to address {:X}", new_pc);
         self.program_counter = new_pc;
         2
+    }
+
+    fn rolc(&mut self, _instruction: &[u8]) -> u8 {
+        let acc = self.read_ram_value(ACC_PTR) as u16;
+        let carry = self.get_carry();
+        let acc = (acc << 1) | (carry as u16);
+        let new_carry = acc & 0x100;
+
+        if new_carry != 0 {
+            self.set_carry();
+        } else {
+            self.clear_carry();
+        }
+
+        let acc = (acc & 0xff) as u8;
+        self.write_ram_value(ACC_PTR, acc);
+        1
     }
 
     fn set1_d9_b3(&mut self, instruction: &[u8]) -> u8 {
