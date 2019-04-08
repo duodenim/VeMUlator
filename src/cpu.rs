@@ -31,7 +31,7 @@ const INSTRUCTIONS: [fn(&mut CPU, &[u8]) -> u8; 256]  = [
     CPU::mov_i8_ri, CPU::mov_i8_ri, CPU::mov_i8_ri, CPU::mov_i8_ri, //0x24-0x27
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x28-0x2B
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x2C-0x2F
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x30-0x33
+    CPU::mul, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x30-0x33
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x34-0x37
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x38-0x3B
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x3C-0x3F
@@ -39,7 +39,7 @@ const INSTRUCTIONS: [fn(&mut CPU, &[u8]) -> u8; 256]  = [
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x44-0x47
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x48-0x4B
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x4C-0x4F
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x50-0x53
+    CPU::unimplemented, CPU::unimplemented, CPU::dbnz_d9_r8, CPU::dbnz_d9_r8, //0x50-0x53
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x54-0x%7
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x58-0x5B
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0x5C-0x5F
@@ -67,16 +67,16 @@ const INSTRUCTIONS: [fn(&mut CPU, &[u8]) -> u8; 256]  = [
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xB4-0xB7
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xB8-0xBB
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xBC-0xBF
-    CPU::unimplemented, CPU::ldc, CPU::unimplemented, CPU::unimplemented, //0xC0-0xC3
+    CPU::ror, CPU::ldc, CPU::unimplemented, CPU::unimplemented, //0xC0-0xC3
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xC4-0xC7
     CPU::clr1_d9_b3, CPU::clr1_d9_b3, CPU::clr1_d9_b3, CPU::clr1_d9_b3, //0xC8-0xCB
     CPU::clr1_d9_b3, CPU::clr1_d9_b3, CPU::clr1_d9_b3, CPU::clr1_d9_b3, //0xCC-0xCF
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xD0-0xD3
+    CPU::rorc, CPU::unimplemented, CPU::or_d9, CPU::or_d9, //0xD0-0xD3
     CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xD4-0xD7
     CPU::clr1_d9_b3, CPU::clr1_d9_b3, CPU::clr1_d9_b3, CPU::clr1_d9_b3, //0xD8-0xDB
     CPU::clr1_d9_b3, CPU::clr1_d9_b3, CPU::clr1_d9_b3, CPU::clr1_d9_b3, //0xDC-0xDF
-    CPU::unimplemented, CPU::and_i8, CPU::unimplemented, CPU::unimplemented, //0xE0-0xE3
-    CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, CPU::unimplemented, //0xE4-0xE7
+    CPU::rol, CPU::and_i8, CPU::unimplemented, CPU::unimplemented, //0xE0-0xE3
+    CPU::and_ri, CPU::and_ri, CPU::and_ri, CPU::and_ri, //0xE4-0xE7
     CPU::set1_d9_b3, CPU::set1_d9_b3, CPU::set1_d9_b3, CPU::set1_d9_b3, //0xE8-0xEB
     CPU::set1_d9_b3, CPU::set1_d9_b3, CPU::set1_d9_b3, CPU::set1_d9_b3, //0xEC-0xEF
     CPU::rolc, CPU::unimplemented, CPU::xor_d9, CPU::xor_d9, //0xF0-0xF3
@@ -91,7 +91,8 @@ pub struct CPU {
     ram_bank1: [u8; RAM_BANK_1_SIZE],
     ram_sfr: [u8; RAM_SFR_SIZE],
     program_counter: u16,
-    lcd_framebuffer: [bool; LCD_BUFFER_SIZE]
+    lcd_framebuffer: [bool; LCD_BUFFER_SIZE],
+    instrs_since_last_refresh: u32
 }
 
 impl CPU {
@@ -103,7 +104,8 @@ impl CPU {
             ram_bank1: [0; RAM_BANK_1_SIZE],
             ram_sfr: [0; RAM_SFR_SIZE],
             program_counter: 0,
-            lcd_framebuffer: [false; LCD_BUFFER_SIZE]
+            lcd_framebuffer: [false; LCD_BUFFER_SIZE],
+            instrs_since_last_refresh: 0
         };
 
         //Initialize SFRs
@@ -125,7 +127,21 @@ impl CPU {
 
         //Do program counter adjustment here, which will be overwritten by JMP or CALLs as necessary
         self.program_counter += OPCODES_86K[instr_code as usize].num_bytes as u16;
-        INSTRUCTIONS[instr_code as usize](self, &instruction);
+        self.instrs_since_last_refresh += INSTRUCTIONS[instr_code as usize](self, &instruction) as u32;
+
+
+        if self.instrs_since_last_refresh > 32000 {
+            for p_idx in 0..LCD_BUFFER_SIZE {
+                if p_idx % 48 != 47 {
+                    print!("{}", self.lcd_framebuffer[p_idx] as u8);
+                } else {
+                    println!("{}", self.lcd_framebuffer[p_idx] as u8);
+                }
+            }
+
+            println!("-------------------------------------");
+            self.instrs_since_last_refresh = 0;
+        }
     }
 
     fn read_ram_value(&self, address: u16) -> u8 {
@@ -170,7 +186,6 @@ impl CPU {
                 } else {
                     column_addr
                 };
-                println!("Writing to LCD pixel at row: {}, column: {}", row_addr, column_addr);
                 let byte_idx = ((row_addr * 48) + (column_addr * 8)) as usize;
                 for pixel_idx in 0..8 {
                     let p = data & (1 << (7 - pixel_idx));
@@ -317,6 +332,16 @@ impl CPU {
         1
     }
 
+    fn and_ri(&mut self, instruction: &[u8]) -> u8 {
+        let register = instruction[0] & 0x03;
+        let addr = self.get_indirect_address(register);
+        let value = self.read_ram_value(addr);
+        let acc = self.read_ram_value(ACC_PTR);
+        let acc = acc | value;
+        self.write_ram_value(ACC_PTR, acc);
+        1
+    }
+
     fn bn_d9_b3_r8(&mut self, instruction: &[u8]) -> u8 {
         let d9_high_bit = ((instruction[0] & 0b00010000) as u16) << 4;
         let d9_low_bits = instruction[1] as u16;
@@ -416,6 +441,20 @@ impl CPU {
         1
     }
 
+    fn dbnz_d9_r8(&mut self, instruction: &[u8]) -> u8 {
+        let addr_low = instruction[1] as u16;
+        let addr_high = ((instruction[0] & 0x01) as u16) << 8;
+        let addr = addr_high | addr_low;
+        let value = self.read_ram_value(addr) - 1;
+        self.write_ram_value(addr, value);
+
+        if value != 0 {
+            let branch_addr = instruction[2] as i8;
+            self.program_counter = self.program_counter.wrapping_add(branch_addr as u16);
+        }
+        2
+    }
+
     fn div(&mut self, _instruction: &[u8]) -> u8 {
         let acc = self.read_ram_value(ACC_PTR) as u16;
         let c = self.read_ram_value(C_PTR) as u16;
@@ -472,7 +511,7 @@ impl CPU {
         1
     }
 
-    fn ldc(&mut self, instruction: &[u8]) -> u8 {
+    fn ldc(&mut self, _instruction: &[u8]) -> u8 {
         let trl = self.read_ram_value(TRL_PTR) as u16;
         let trh = (self.read_ram_value(TRH_PTR) as u16) << 8;
         let tr = trl | trh;
@@ -506,7 +545,41 @@ impl CPU {
         1
     }
 
+    fn mul(&mut self, _instruction: &[u8]) -> u8 {
+        let acc = self.read_ram_value(ACC_PTR) as u16;
+        let c = self.read_ram_value(C_PTR) as u16;
+        let op1 = (acc << 8) | c;
+        let b = self.read_ram_value(B_PTR) as u16;
+        let result = b as u32 * op1 as u32;
+        self.clear_carry();
+
+        if result & 0xFFFF != 0 {
+            self.set_overflow();
+        } else {
+            self.clear_overflow();
+        }
+
+        let c = (result & 0xFF) as u8;
+        let acc = ((result & 0xFF00) >> 8) as u8;
+        let b = ((result & 0xFF000000) >> 16) as u8;
+        self.write_ram_value(ACC_PTR, acc);
+        self.write_ram_value(B_PTR, b);
+        self.write_ram_value(C_PTR, c);
+        7
+    }
+
     fn nop(&mut self, _instruction: &[u8]) -> u8 {
+        1
+    }
+
+    fn or_d9(&mut self, instruction: &[u8]) -> u8 {
+        let acc = self.read_ram_value(ACC_PTR);
+        let addr_low = instruction[1] as u16;
+        let addr_high = ((instruction[0] & 0x01) as u16) << 8;
+        let addr = addr_high | addr_low;
+        let value = self.read_ram_value(addr);
+        let acc = acc | value;
+        self.write_ram_value(ACC_PTR, acc);
         1
     }
 
@@ -536,9 +609,15 @@ impl CPU {
         let pc_low = self.stack_pop() as u16;
         let new_pc = pc_high | pc_low;
 
-        println!("Returning from function to address {:X}", new_pc);
         self.program_counter = new_pc;
         2
+    }
+
+    fn rol(&mut self, _instruction: &[u8]) -> u8 {
+        let acc = self.read_ram_value(ACC_PTR);
+        let acc = acc.rotate_left(1);
+        self.write_ram_value(ACC_PTR, acc);
+        1
     }
 
     fn rolc(&mut self, _instruction: &[u8]) -> u8 {
@@ -554,6 +633,27 @@ impl CPU {
         }
 
         let acc = (acc & 0xff) as u8;
+        self.write_ram_value(ACC_PTR, acc);
+        1
+    }
+
+    fn ror(&mut self, _instruction: &[u8]) -> u8 {
+        let acc = self.read_ram_value(ACC_PTR);
+        let acc = acc.rotate_right(1);
+        self.write_ram_value(ACC_PTR, acc);
+        1
+    }
+
+    fn rorc(&mut self, _instruction: &[u8]) -> u8 {
+        let old_carry = self.get_carry();
+        let acc = self.read_ram_value(ACC_PTR);
+        let new_carry = acc & 0x01;
+        let acc = (acc >> 1) | (old_carry << 7);
+        if new_carry != 0 {
+            self.set_carry();
+        } else {
+            self.clear_carry();
+        }
         self.write_ram_value(ACC_PTR, acc);
         1
     }
@@ -602,13 +702,6 @@ impl CPU {
     }
 
     fn unimplemented(&mut self, instruction: &[u8]) -> u8 {
-        for p_idx in 0..LCD_BUFFER_SIZE {
-            if p_idx % 48 != 47 {
-                print!("{}", self.lcd_framebuffer[p_idx] as u8);
-            } else {
-                println!("{}", self.lcd_framebuffer[p_idx] as u8);
-            }
-        }
         panic!("Unimplmented Instruction at 0x{:04X}: 0x{:02X} - {}", self.program_counter - OPCODES_86K[instruction[0] as usize].num_bytes as u16, instruction[0], OPCODES_86K[instruction[0] as usize].name);
     }
 }
