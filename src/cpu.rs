@@ -2,6 +2,7 @@ const ROM_SIZE: usize = 65536;
 const RAM_BANK_0_SIZE: usize = 256;
 const RAM_BANK_1_SIZE: usize = 256;
 const RAM_SFR_SIZE: usize = 256;
+const LCD_BUFFER_SIZE: usize = 48 * 32;
 
 const ACC_PTR: u16 = 0x100;
 const PSW_PTR: u16 = 0x101;
@@ -11,6 +12,7 @@ const TRL_PTR: u16 = 0x104;
 const TRH_PTR: u16 = 0x105;
 const SP_PTR: u16 = 0x106;
 const P3_PTR: u16 = 0x14C;
+const XBNK_PTR: u16 = 0x125;
 const LCD_START_PTR: u16 = 0x180;
 const LCD_END_PTR: u16 = 0x1FB;
 
@@ -88,7 +90,8 @@ pub struct CPU {
     ram_bank0: [u8; RAM_BANK_0_SIZE],
     ram_bank1: [u8; RAM_BANK_1_SIZE],
     ram_sfr: [u8; RAM_SFR_SIZE],
-    program_counter: u16
+    program_counter: u16,
+    lcd_framebuffer: [bool; LCD_BUFFER_SIZE]
 }
 
 impl CPU {
@@ -99,7 +102,8 @@ impl CPU {
             ram_bank0: [0; RAM_BANK_0_SIZE],
             ram_bank1: [0; RAM_BANK_1_SIZE],
             ram_sfr: [0; RAM_SFR_SIZE],
-            program_counter: 0
+            program_counter: 0,
+            lcd_framebuffer: [false; LCD_BUFFER_SIZE]
         };
 
         //Initialize SFRs
@@ -138,8 +142,44 @@ impl CPU {
     fn write_ram_value(&mut self, address: u16, data: u8) {
         assert!(address <= 0x1FF, "Address must be less than 512!");
 
-        if address & 0x100 != 0 { //BIt 9 is always used for SFRs
-            self.ram_sfr[(address & 0xFF) as usize] = data;
+        if address & 0x100 != 0 { //Bit 9 is always used for SFRs
+            //Redirect LCD framebuffer writes
+            if address >= LCD_START_PTR && address <= LCD_END_PTR {
+                let lcd_addr = address - LCD_START_PTR;
+                let xbnk = self.read_ram_value(XBNK_PTR);
+                let row_addr = if xbnk == 0 {
+                    let group_addr = lcd_addr / 16;
+                    if (lcd_addr & 0xF) > 5 {
+                        (2 * group_addr) + 1
+                    } else {
+                        2 * group_addr
+                    }
+                } else {
+                    let group_addr = lcd_addr / 16;
+                    if (lcd_addr & 0xF) > 5 {
+                        (2 * group_addr) + 1 + 16
+                    } else {
+                        (2 * group_addr) + 16
+                    }
+                };
+
+                let column_addr = lcd_addr % 16;
+                assert!(column_addr <= 0x0B, "Column {:X} not used on LCD!", column_addr);
+                let column_addr = if column_addr > 0x05 {
+                    column_addr - 6
+                } else {
+                    column_addr
+                };
+                println!("Writing to LCD pixel at row: {}, column: {}", row_addr, column_addr);
+                let byte_idx = ((row_addr * 48) + (column_addr * 8)) as usize;
+                for pixel_idx in 0..8 {
+                    let p = data & (1 << (7 - pixel_idx));
+                    self.lcd_framebuffer[byte_idx + pixel_idx] = p != 0;
+                }
+            } else {
+                self.ram_sfr[(address & 0xFF) as usize] = data;
+            }
+            
         } else {
             //Assume ram bank 0
             self.ram_bank0[(address & 0xFF) as usize] = data;
@@ -562,6 +602,13 @@ impl CPU {
     }
 
     fn unimplemented(&mut self, instruction: &[u8]) -> u8 {
+        for p_idx in 0..LCD_BUFFER_SIZE {
+            if p_idx % 48 != 47 {
+                print!("{}", self.lcd_framebuffer[p_idx] as u8);
+            } else {
+                println!("{}", self.lcd_framebuffer[p_idx] as u8);
+            }
+        }
         panic!("Unimplmented Instruction at 0x{:04X}: 0x{:02X} - {}", self.program_counter - OPCODES_86K[instruction[0] as usize].num_bytes as u16, instruction[0], OPCODES_86K[instruction[0] as usize].name);
     }
 }
